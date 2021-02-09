@@ -10,36 +10,17 @@
 
     <body>
         <div class="container">
-            <div class="row mt-5">
-                <div class="col-md-6">
-                    <h5> Checkout: </h5>
+            <p> <b>Stripe Payment intent id:</b> {{$paymentIntentId}}</p>
 
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th> Title </th>
-                                <th> Cost </th>
-                            </tr>
-                        </thead>
+            @foreach(auth()->user()->basket as $basket)
+                <b>Item:</b> {{ $basket->product->title }} x {{$basket->quantity}} <b>Cost: {{ $basket->product->cost * $basket->quantity }} </b> <br>
+            @endforeach
 
-                        @foreach($items as $item)
-                        <tr>
-                            <td> {{$item['title']}} </td>
-                            <td> {{$item['cost']}} </td>
-                        </tr>
-                        @endforeach
-
-                        <tr>
-                            <td><b> Total:</b> </td>
-                            <td> <b>{{$total}} </b></td>
-                        </tr>
-                    </table>
-                </div>
-            </div>
+            <b> Total: </b>{{ auth()->user()->getBasketTotal() }}
 
             <div class="row mt-5">
                 <div class="col-md-6">
-                    <form action="/confirm-purchase" method="post" id="payment-form">
+                    <form action="/store-order" method="post" id="payment-form">
                         <div class="form-row">
                             <label for="card-element">
                                 Credit or debit card
@@ -70,6 +51,8 @@
                 var cardMount = elements.create('card', {
                     hidePostalCode: true
                 });
+
+
                 cardMount.mount('#card-element');
 
                 var paymentForm = document.getElementById('payment-form');
@@ -77,19 +60,17 @@
                     event.preventDefault();
 
                     stripe.confirmCardPayment('{{$clientSecret}}', {
-                            payment_method: {card: cardMount}
-                        })
-                        .then(function(result) {
-                            if (result.error) {
-                                var errorSection = document.getElementById('card-errors');
-                                errorSection.textContent = result.error.message;
-                            } else {
-                                // POST to backend to confirm the purchase.
-                                $csrfToken = $("[name=_token]").val();
-                                paymentForm.submit();
-                            }
-                        });
-
+                        payment_method: {card: cardMount}
+                    }).then(function(result) {
+                        if (result.error) {
+                            var errorSection = document.getElementById('card-errors');
+                            errorSection.textContent = result.error.message;
+                        } else {
+                            // POST to backend to confirm the purchase.
+                            $csrfToken = $("[name=_token]").val();
+                            paymentForm.submit();
+                        }
+                    });
                 });
             });
 

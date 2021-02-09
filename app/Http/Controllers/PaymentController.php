@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use Stripe\Stripe;
+use App\Basket;
+use App\Purchase;
 
 class PaymentController extends Controller{
     public function __construct() {
@@ -10,44 +12,44 @@ class PaymentController extends Controller{
         Stripe::setApiKey($this->stripeSecret);
     }
 
-    public function checkoutView() {
-        $items = [
-            ['id' => 1, 'title' => 'Mythical Man-Month, The: Essays on Software Engineering', 'cost' => 23.99], 
-            ['id' => 3, 'title' => 'Peopleware: Productive Projects and Teams', 'cost' => 18.94]
-        ];
+    public function checkout() 
+    {
+        if (!auth()->user()->basket()->exists()) {
+            return 'No items in the basket'; 
+        }
 
-        $total = array_sum(array_column($items, 'cost'));
+        $total = auth()->user()->getBasketTotal();
 
         $intent = \Stripe\PaymentIntent::create([
             'amount' => $total * 100, 'currency' => 'gbp',
         ]);
 
-        // Client secret represents the amount to charge the user. It will be used to charge their card.
+        // Client secret represents the amount to charge the user. It will be used to charge their card and payment verification later.
         $clientSecret = $intent->client_secret;
 
-        // Store $paymentIntentId in the database against the order. Which will be used to confirm the payment later.
-        $paymentIntentId = $intent->id;
+        $basket = auth()->user()->basket()->update(['stripe_payment_intent_id' => $intent->id]);
 
-        return view('checkout', ['clientSecret' => $clientSecret, 'paymentIntentId' => $paymentIntentId, 'items' => $items, 'total'=> $total]);
+        return view('checkout', ['clientSecret' => $clientSecret, 'paymentIntentId' => $intent->id, 'total'=> $total]);
     }
 
-    public function confirmPurchaseWithStripe() {
-        $paymentIntentId = request()->input('paymentIntentId');
+    public function storeOrder() 
+    {
+        // Move info from basket to transactions table.
+        $basket = auth()->user()->basket;
 
-        if($this->isPaymentSuccessful($paymentIntentId)){
-            // Update order and mark it paid
-            return response('success', 200);
+        foreach($basket as $item) {
+            $data = [
+                'user_id' => $item->user_id,
+                'product_id' => $item->product_id,
+                'quantity' => $item->quantity,
+                'stripe_payment_intent_id' => $item->stripe_payment_intent_id
+            ];
+
+            Purchase::create($data);
         }
-    
-        return response('failed', 500);
-    }
 
-    private function isPaymentSuccessful($paymentIntentId) {
-        // Check if this token exists in the database.
-        $stripeClient = new \Stripe\StripeClient($this->stripeSecret);
-
-        $piRetrieve = $stripeClient->paymentIntents->retrieve($paymentIntentId, []);
-
-        return $piRetrieve->status == 'succeeded';
+        auth()->user()->basket()->delete();
+        
+        return redirect('orders');
     }
 }
