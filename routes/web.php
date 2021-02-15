@@ -18,3 +18,5 @@ Route::middleware(['auth'])->group(function(){
     Route::post('add-basket', 'BasketController@add');
     Route::get('logout', 'LoginController@logout');
 });
+
+Route::post('verify-payment', 'PaymentController@stripePaymentVerificationEndpoint');

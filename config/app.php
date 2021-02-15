@@ -3,6 +3,7 @@
 return [
 
     'stripeSecret' => env('STRIPE_SECRET'),
+    'stripeEndpointSecret' => env('STRIPE_ENDPOINT_SECRET'),
     
     /*
     |--------------------------------------------------------------------------
